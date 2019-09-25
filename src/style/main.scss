@@ -1,0 +1,179 @@
+$body-width: 900px;
+$default-margin: 20px;
+
+@mixin rooted-block
+{
+    box-sizing: border-box;
+    width: $body-width;
+    margin: 0 auto;
+}
+
+body 
+{
+    margin: 0;
+    padding: 0;
+    background: #fbfaf7;
+
+    font-family: 'Open Sans', sans-serif;
+
+    > header
+    {
+        background: #a2d8e8; /* Old browsers */
+        background: -moz-linear-gradient(-45deg, #a2d8e8 0%, #009ece 100%); /* FF3.6-15 */
+        background: -webkit-linear-gradient(-45deg, #a2d8e8 0%,#009ece 100%); /* Chrome10-25,Safari5.1-6 */
+        background: linear-gradient(135deg, #a2d8e8 0%,#009ece 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+        filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#a2d8e8', endColorstr='#009ece',GradientType=1 ); /* IE6-9 fallback on horizontal gradient */
+        margin-top: 0;
+
+        padding-top: 15px;
+        padding-bottom: 12px;
+
+        > div
+        {
+            @include rooted-block;
+
+            > H1 
+            {
+                margin-top: 0;
+                font-family: Lora;
+                font-weight: normal;
+                font-size: 2.6em;
+
+                > a
+                {
+                    text-decoration: none;
+                    color: #e5eef7;
+                }
+
+                > a:hover
+                {
+                    color: white;
+                }
+            }
+
+            > nav
+            {
+                font-size: 1.3em;
+                
+                > a
+                {
+                    padding-right: 0.6em;
+                    text-decoration: none;
+                    color: #204884;
+                }
+
+                > a:hover
+                {
+                    color: white;
+                }
+            }
+        }
+    }
+
+    > main
+    {
+        @include rooted-block;
+
+        H1, H2, H3, H4, H5, H6
+        {
+            color: #0b90b9;
+            font-family: Lora;
+            font-weight: normal;
+        }
+
+        H1
+        {
+            font-size: 2em;
+            margin-top: 2em;
+            margin-bottom: 1em;
+        }
+
+        H2
+        {
+            font-size: 1.8em;
+            margin-top: 0.9em;
+            margin-bottom: 0.5em;
+        }
+
+        H3
+        {
+            font-size: 1.4em;
+            margin-top: 0.9em;
+            margin-bottom: 0.5em;
+        }
+
+        H4
+        {
+            font-size: 1.2em;
+        }
+
+        > article
+        {
+            font-size: 1.0em;
+            line-height: 1.6em;
+
+            > blockquote
+            {
+                font-style: italic;
+                border-left: #0b90b9 4px solid;
+                padding-left: 1em;
+            }
+
+            > p
+            {
+                > code
+                {
+                    background: #eceeee;
+                    padding: 0 0.2em;
+                }
+            }
+
+            > div.note
+            {
+                padding: 0.2em 1.2em;
+                border-left: #0b90b9 4px solid;
+                background: #eceeee;
+            }
+
+            > pre
+            {
+                background: #eceeee;
+                padding: 1em;
+            }
+
+            code
+            {
+                font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace, sans-serif;
+            }
+        }
+    }
+
+    > footer
+    {
+        @include rooted-block;
+        text-align: center;
+        padding: 3em 0;
+        font-size: 0.8em;
+    }
+}
+
+section.index-list
+{
+    > H2
+    {
+        margin-bottom: 0;
+
+        > a
+        {
+            text-decoration: none;
+            color: inherit;
+        }
+    }
+
+    > p.details
+    {
+        color: #888;
+        font-size: 0.8em;
+        margin-top: -0.1em;
+    }
+}

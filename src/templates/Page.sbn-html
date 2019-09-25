@@ -1,0 +1,2 @@
+<H1>{{ doc.title}}</H1>
+{{ doc.body }}

@@ -1,0 +1,9 @@
+{{ for post in posts }}
+<section class="index-list">
+    <H2>
+        <a href="./posts/{{ kebabify post.title }}.html">{{ post.title }}</a>
+    </H2>
+    <p class="details">{{ date.to_string post.publish_date '%d %B %Y' }}</p>
+    {{ post.intro }}
+</section>
+{{ end }}

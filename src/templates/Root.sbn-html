@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="{{ mkLink "/style.css" }}">
+    <link href="https://fonts.googleapis.com/css?family=Lora|Open+Sans&display=swap" rel="stylesheet"> 
+    <title>{{ site.name }}{{
+                        if post
+                            " - " + post.title
+                        end
+            }}</title>
+</head>
+
+<body>
+    <header>
+        <div>
+            <H1>
+                <a href="{{ mkLink "/index.html" }}">
+                    {{ site.name }}
+                </a>
+            </H1>
+            {{ include "Nav" }}
+        </div>
+    </header>
+    <main>
+        {{ include page.template }}
+    </main>
+    <footer>
+        "Powered" by <a href="https://github.com/aikixd/PlainBlog">PlainBlog</a>
+    </footer>
+</body>
+</html> 
