@@ -5,7 +5,7 @@
 <div id="disqus_thread"></div>
 <script>
     var disqus_config = function () {
-        this.page.url = "/posts/{{ kebabify post.title }}.html";  // Replace PAGE_URL with your page's canonical URL variable
+        this.page.url = "https://aikixd.github.io/posts/{{ kebabify post.title }}.html";  // Replace PAGE_URL with your page's canonical URL variable
         this.page.identifier = "{{ kebabify post.title }}"; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
     };
 

@@ -1,4 +1,4 @@
-@Title: OOP is not what we've been taugh
+@Title: OOP is not what we've been taught
 @PublishDate: 2019-9-23
 
 OOP has had some heavy criticism over the years. It ranges many subjects, from complex and convoluted codebases, to the lack of identity of OOP in general and straight up to false premises of the paradigm. And you can't say that it comes from some conspiracy theorist types. Alan Kay, Edsger Dijkstra and Linus Torvalds are among those people. There's no smoke without fire. It seems though, that much of it doesn't address the OOP paradigm itself, but what it ought to be.
