@@ -128,7 +128,7 @@ In return object give you two important advantages: flexibility and performance.
 So now we can finally correctly describe objects:
 
 :::note
-Objects are types that have procedure attached to them in form of methods and provide tools for changing the implementations of their methods at runtime.
+Objects are types that own procedures in form of methods and provide tools for changing the implementations of their methods.
 :::
 
 This definition has several advantages over other that I've encountered throughout the years:
