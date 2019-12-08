@@ -1,0 +1,256 @@
+@Title: Dependency Injection is only half a story
+@PublishDate: 2019-12-8
+
+When it comes to designing an OOP application two main principles are applied: Dependency Injection and Inversion of Control (there are other principles, but they are more localized in their scope, and are less relevant). 
+
+Inversion of Control is the end goal. Taking the control of program's control flow from the bottom of the application and bubbling it up, closer to the entry point. Thus lower levels of the application, will not dictate where and how the entire program should run.
+
+Dependency Injection is a tool that is used to support that goal. Instead of creating implementation in-place, it is instead declared as a dependency. The client code then needs to provide an instance of this dependency. By doing so, the control of creating that instance is now taken from the consumer type and instead moved up a level, to the client code. The client then, can declare the same instance as a dependency itself, and propagate the control further up. At the end, the creation of such a dependency will surface at a location, where it is the most convenient to do that.
+
+This seems to work well. It reduces coupling within the code, adds flexibility and an ability to easily switch the environment and move components around. On paper. In reality though, even when best DI practices are used, after a while it becomes very difficult to introduce changes, abstractions start to leak and the code becomes less and less maintainable.
+
+The center piece of a typical application is the domain. It defines models (like users, subscriptions and accounts) along with their relationships: a user can befriend another user. The domain defines the theoretical capabilities of the program. It does not depend on any other component. In order to have any impact on the environment it defines a set of interfaces, which the services must implement, and uses them instead: 
+
+```csharp
+public class User
+{
+    // ...
+
+    private readonly IRepository repo;
+    private readonly IMailing mailing;
+
+    public void TrySendValidationEmail(DateTime now)
+    {
+        var account = this.repo.GetAccount(this.id);
+
+        if (account.IsValidated == false &&
+            now - account.LastValidationSent > Timespan.FromDays(1))
+        {
+            this.mailing.SendValidationEmail(account.Email, this.Name);
+        }
+    }
+}
+```
+
+Even though this method uses DI for each of its services, there are numerous problems with it. We will discover them by trying to implement some requirements.
+
+### 1. Test whether the method logic is fine.
+
+In other words, test that the `if` statement of the method is correct. This is surprisingly hard to do here. First, the statement depends on the account value, which is being retrieved from a repository. So we would have to provide a mock service for it. Then, there's a problem of testing the result of the `if`, since id doesn't return any value, just calls a void method. This will require another mock. But unlike the `IRepository` mock, which can act in a realistic manner: manipulating the data in memory, the `IMailing` mock will have to be suited specifically for this test, to register the call to `SendValidationEmail`. This will most definetly lead to use of a mocking framework, which brings a set of additional problems to the table.
+
+### 2. There are workflows in which the account will already be retrieved, reuse it.
+
+While easy to fix, just define `account` as a parameter and make additional method that retrieves the account from the repository, this approach will bite you in the butt after a while. Requirements like this will continue to come, and your domain class will become populated with methods that just provide functionality for external components. This is an abstraction leak. By introducing those methods, you tie the domain to implementation details of its users. Situations where fixing a bug leads to several more are created here. Since the domain is the most dependent component of the system, the changes within it will propagate through the entire system, making them unpredictable. Components should not control what they can't. In case of the domain, it's everything else.
+
+### 3. We can now send messages through SMS also. Send SMS or email based on user preference.
+
+Two parts to the story. First, technical, how to actually implement it.
+Since there are now two message systems, it is a good thing to abstract the away. The problem is that this abstraction will require more information than the one already in use: in addition to the email it will also need a phone and the preferences of the user:
+
+```csharp
+public class User
+{
+    // ...
+
+    private readonly IRepository repo;
+    private readonly IMailing mailing;
+
+    public void TrySendValidationEmail(Account account, Preferences prefs, DateTime now)
+    {
+        if (account.IsValidated == false &&
+            now - account.LastValidationSent > Timespan.FromDays(1))
+        {
+            this.NotificationService.SendValidationMessage(
+                account.ContactInfo, 
+                prefs, 
+                this.Name);
+        }
+    }
+}
+```
+
+Even though the actual messaging services are abstracted away, the problem persists. We still need to provide additional information, which is not actually used in the method itself. This now makes it impossible to use that method from locations where preferences aren't available. So we now need to provide additional method that can take care of that. So we are now at problem two again. 
+But the problem is now much bigger. Since we need to account both the `Account` and `Preferences` instances, we need to provide these signatures:
+```csharp
+public class User
+{
+    // When no info is loaded
+    public void TrySendValidationEmail(DateTime now) { ... }
+    // When Account is loaded
+    public void TrySendValidationEmail(Account account, DateTime now) { ... }
+    // When Preferences are loaded
+    public void TrySendValidationEmail(Preferences prefs, DateTime now) { ... }
+    // When both arguments are loaded
+    public void TrySendValidationEmail(Account account, Preferences prefs, DateTime now) { ... }
+}
+```
+
+With an additional similar change the number of parameters will double. And then double again. This approach is unsustainable.
+
+Another consideration is the question: Why is the `User` is aware of existence of a messaging system at all? This class describes what a user is and what capabilities and relationship it has. Sending notifications or validation messages is out of scope of this definition. Users can exist just fine without any notification system. This may seem like a stretch, but when a system lives long enough, entire technologies may be discontinued or switched with another, incompatible ones. And depending on an interface of the old technology will cause a lot of pain.
+
+### 4. If the invoker of this method is system owner, send notification regardless.
+
+This type of requirement is one of the most common and hateful. Change the behavior somewhere in the deepest pit of your application, based on the information that is only available at the entry point. You are then tasked with propagating some piece of information across a lot of boundaries. If you ever found asking yourself "WTF is it doing here?!" it's because of such requirements. Weird parameters, unsafe static members, single property services, etc., start their adventure here.
+
+```csharp
+public class User
+{
+    // ...
+
+    private readonly IRepository repo;
+    private readonly IMailing mailing;
+
+    public void TrySendValidationEmail(
+        Account account, 
+        Preferences prefs, 
+        DateTime now, 
+        bool isCalledByAdmin)
+    {
+        if (account.IsValidated == false &&
+            now - account.LastValidationSent > Timespan.FromDays(1) ||
+            isCalledByAdmin)
+        {
+            this.NotificationService.SendValidationMassage(
+                account.ContactInfo, 
+                prefs, 
+                this.Name);
+        }
+    }
+}
+```
+
+## Why does this happens?
+
+All of the problems that we have encountered can be reduced to two main issues.
+1. Coupling of domain rules with service invocation. This is what makes it hard to test the method or change its impact on the outside world.
+2. Propagation of changes against the dependency direction. This is why the domain had to be changed with addition or modification of a service.
+
+In case of the first issue, the reason is quite simple: it is not possible to call a part of a method. It's all or nothing. The method does everything in its body, always and forever. It is not possible to change that behavior without rewriting it.
+
+The second problem is trickier. The explanation requires us to understand what dependency really is. Without going into too much details, which I will cover in later posts, dependency is a directed relationship between two types or operations. This relationship describes, among other things, how changes are propagated. When a dependency is changed, so must the dependant type or operation. 
+
+Changing the name of the interface `IMailing` to `IMessaging` is trivial. But problem is not the interface name. The dependency isn't really is created on the type itself, but on its interface. Not the `interface` keyword, but the set of members that the type declares. In our case, the `SendValidationEmail(Email, Name)` is one of such members. The new interface will have not have it, but instead it will have a `SendValidationMessage(<New sort of parameter>, Name)`. Since different messaging systems use different contact data, we need to invent a way to pass it in. Even if we will go to the most straightforward solution of just having a `ContactInfo` with all possible options, this change still needs to be propagated to all the above layers or with the introduction of a new service, that will do that for us.
+
+## The solution
+
+The solution is to stop abusing Dependency Injection and use operation composing instead. Rather then injecting services into the domain logic, we will create a chain of actions that a certain scenario requires. 
+
+First we will remove every notion of services from the domain. Instead of trying to send validation email, the method will only check whether it should send it:
+
+```csharp
+public class User
+{
+    // ...
+
+    public static bool ShouldSendValidationEmail(Account account, DateTime now)
+    {
+        if (account.IsValidated == false &&
+            now - account.LastValidationSent > Timespan.FromDays(1))
+        {
+            return true;
+        }
+
+        return false;
+    }
+}
+```
+
+This new method contains only the domain logic. It is easily testable and requires no mocking. It hasn't any state, so it is possible to make it static, which simplifies testing even more. In case when you need to have it in an instance context, you can wrap it inside the required method. This way the wrapper method will not need to be tested for correctness, only to account for its state.
+
+Now, we need to somehow combine the all the actions together. We will introduce a new layer, the composition layer:
+
+```csharp
+public class Users
+{
+    public void TrySendValidationEmail(User user)
+    {
+        var account = this.repository.GetAccount(user.id);
+
+        if (Account.ShouldSendValidationEmail(account, DateTime.Now))
+        {
+            this.mailling.SendValidationEmail(account.Email, user.Name);
+        }
+    }
+}
+```
+
+## Is this better?
+
+Let's see whether this approach helps us with the problems we encountered with the initial approach.
+
+The composition layer is the topmost layer of the program. Its duty is to combine different capabilities of the program into real operations. This way the domain logic and the services are completely isolated. In this specific example, the services utilize the domain model, but it is possible and many times preferred to completely cut the connection and map the values between types of each side. 
+
+With such a design, domain isn't aware of any service, nor the services themselves are aware of any other service. This separation gives an ability to compose any operation that the domain or services support, without sacrificing the flexibility of any of the components. 
+
+Any requirement thrown at the system may be efficiently expressed within the composition. For example, if a decision is made, that the application no longer uses a repository, and instead will receive all needed information with the API calls. With the initial approach, it could become very difficult, to account for the lack of repository that stretched throughout the codebase. With new approach, such change would be trivial, since all connections between the repository and the rest of the system are constrained by the composition layer. This aids well in many scenarios. For example, if you have a microservice the you want to split.
+
+Since the composition is topmost layer and is called straight from the entry point (UI, web controller, system event, etc.) it has the flexibility no other component can have.
+- It has access to the entire program and any piece of information within it. You are free to implement any requirement without having to drag the data through the application layers.
+- Tracking changes is trivial. Since composition can only be called from within itself or the entry point, it is easy to track changes in terms of both dependencies and control flow. Tracking control flow is completely impossible from within services or the domain. 
+- There's no need to account for the above layers, since there are none. Each method can be tailored for a concrete scenario. They can be easily changed or removed, which makes them future proof.
+
+Applying the four sample requirements will also pose no problem. I will provide the final version of the code, with all of them together. 
+
+```csharp
+public class Users
+{
+    //...
+
+    // Requirement 2:
+    // Caller method is guaranteed to be able to retrieve account 
+    // instance by itself, when necessary.
+    public Result<MessageState> TrySendValidationMessage(User user, Account account)
+    {
+        // Requirement 1:
+        // ShouldSendValidationMessage is independent and stateless,
+        // hence it is easily testable.
+        if (Account.ShouldSendValidationMessage(account, DateTime.Now) ||
+            // Requirement 4:
+            // Composition layer has the entire program data at
+            // its disposal and can easily access it.
+            this.auth.User.IsOwner)
+        {
+            return this.SendValidationMessage(user, account);
+        }
+
+        return Result.From(MessageState.NotSent);
+    }
+
+    public ValidationMessageState SendValidationMessage(User user, Account account)
+    {
+        // Requirement 3:
+        // Adding a new service does not impact the rest of the code in 
+        // any way. There's no need to create additional abstractions
+        // just to be able to call the new service. This makes the
+        // decision whether to use additional abstraction or not a design
+        // consideration, rather than an implementation necessity.
+        switch (user.PreferredContactMethod)
+        {
+            case ContactMethod.SMS:
+                return this.SmsService.SendValidationMessage(account.Phone, user.Name);
+                break;
+            
+            default:
+                return this.MailingService.SendValidationEmail(account.Email, user.Name);
+                break;
+        }
+    }
+}
+```
+
+You can see here, that the composition consists purely of conditional branching and calls to services and the domain. It only connects the components together into a workflow, without defining any logic beyond that.
+
+Because non of the components are aware of each other, they are easily testable. Each service can have a separate test suit that will test the service in complete isolation, without the needless risk of involving mocking frameworks. The composition then only needs to be tested for a correct order of operations. 
+
+One approach would be to create mock service implementations. Those mocks should be tested against the same tests that a real service is tested with. This will ensure that mock implementations are always relevant and up to date. Another approach is to use Type Driven Design. Since the composition layer does not do any actual operations, the compiler will be able to exhaustively prove the correctness of your composition.
+
+## Why DI is not enough?
+
+Dependencies pack operations within other operations, creating vertical connection. While you are injecting objects, you kind of dive into lower levels of your application. 
+
+But applications are not one-dimensional. They have at least two dimensions. Vertical, which describes the component distance from the entry point: database, data-access, domain, UI and such, which is loosely described by the services. And horizontal, which consists of different domain models. Trying to describe the entire application with only vertical connections can't be done, you still have to express the horizontal ones. 
+
+Without a dedicated location where those connection are defined, their actual location is undefined and not predictable. They will just be evenly spread across the entire codebase. Thus, when a change is to be made, it is not clear what parts of the program would be affected. This is where the composition layer aids. It is the place that connects both axes of the program. The composition itself is injected with the dependencies, and then makes the decision on how to use them. You can even inject a composition into another composition. An injected composition will never be affected by its ancestor, so it can be used to safely express different domain areas.
+
+This combination helps us to achieve a cleaner Inversion of Control. The actual workflow is defined *only* within the composition and does not leak downwards into services or the domain. 
