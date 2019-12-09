@@ -139,7 +139,7 @@ The solution is to stop abusing Dependency Injection and use operation composing
 First we will remove every notion of services from the domain. Instead of trying to send validation email, the method will only check whether it should send it:
 
 ```csharp
-public class User
+public class Account
 {
     // ...
 
