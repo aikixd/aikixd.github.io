@@ -132,7 +132,7 @@ But the problem is now much bigger. Since we need to account both the <code>Acco
 <h2>The solution</h2>
 <p>The solution is to stop abusing Dependency Injection and use operation composing instead. Rather then injecting services into the domain logic, we will create a chain of actions that a certain scenario requires.</p>
 <p>First we will remove every notion of services from the domain. Instead of trying to send validation email, the method will only check whether it should send it:</p>
-<pre><code class="language-csharp">public class User
+<pre><code class="language-csharp">public class Account
 {
     // ...
 
